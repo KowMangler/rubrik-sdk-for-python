@@ -87,5 +87,15 @@ update_sla = rubrik.update_sla(
 
 
 print(update_sla)
+
+# update hourly retention
+hourly_frequency = 2
+hourly_retention = 48
+
+update_sla = rubrik.update_sla(
+    name=sla_name,
+    hourly_frequency=hourly_frequency,
+    hourly_retention=hourly_retention
+)
 ```
 
