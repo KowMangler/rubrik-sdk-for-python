@@ -97,5 +97,7 @@ update_sla = rubrik.update_sla(
     hourly_frequency=hourly_frequency,
     hourly_retention=hourly_retention
 )
+
+print(update_sla)
 ```
 
