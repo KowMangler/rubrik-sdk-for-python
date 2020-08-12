@@ -1766,7 +1766,7 @@ class Data_Management(Api):
             return self.post("v1", "/sla_domain", config, timeout=timeout)
 
     def update_sla(self, name, hourly_frequency=None, hourly_retention=None, daily_frequency=None, daily_retention=None, monthly_frequency=None, monthly_retention=None, yearly_frequency=None, yearly_retention=None, archive_name=None, retention_on_brik_in_days=None, instant_archive=False, starttime_hour=None, starttime_min=None, duration_hours=None, replication_target=None, replication_retention_in_days=None, timeout=15):  # pylint: ignore
-        """Create a new SLA Domain.
+        """Update an SLA Domain.
         Arguments:
             name {str} -- The name of the SLA Domain.
         Keyword Arguments:
@@ -1778,13 +1778,13 @@ class Data_Management(Api):
             monthly_retention {int} -- Number of hours to retain the monthly backups. (default: {None})
             yearly_frequency {int} -- Yearly frequency to take backups. (default: {None})
             yearly_retention {int} -- Number of hours to retain the yearly backups. (default: {None})
-            archive_name {str} -- The optional archive location you wish to configure on the SLA Domain. Keyword "REMOVE" will remove the currently set archive location. When populated, you must also provide a `retention_on_brik_in_days` unless "REMOVE" is set. (default: {None})
+            archive_name {str} -- The optional archive location you wish to configure on the SLA Domain. Keyword `REMOVE` will remove the currently set archive location. When populated, you must also provide a `retention_on_brik_in_days` unless `REMOVE` is set. (default: {None})
             retention_on_brik_in_days {int} -- The number of days you wish to keep the backups on the Rubrik cluster. When populated, you must also provide a `archive_name`. (default: {None})
             instant_archive= {bool} -- Flag that determines whether or not to enable instant archive. Set to true to enable. (default: {False})
             starttime_hour {int} -- (CDM 5.0+) Starting hour of allowed backup window. (default: {None})
             starttime_min {int} -- (CDM 5.0+) Starting minute of allowed backup window. When populated, you must also provide a `starttime_min`. (default: {None})
             duration_hours {int} -- (CDM 5.0+) Length of allowed backup window. When populated, you must also provide both `startime_min` and `starttime_hour`. (default: {None})
-            replication_target {str} -- (CDM 5.0+) Name of the replication target cluster. Keyword "REMOVE" will remove the currently set replication target from the SLA. When populated, you must also provide `replication_retention_in_days` unless "REMOVE" is set. (default: {None})
+            replication_target {str} -- (CDM 5.0+) Name of the replication target cluster. Keyword `REMOVE` will remove the currently set replication target from the SLA. When populated, you must also provide `replication_retention_in_days` unless `REMOVE` is set. (default: {None})
             replication_retention_in_days {int} -- (CDM 5.0+) Number of days to retain backup on target cluster. When populated, you must also provide `replication_target`. (default: {None})
 
         Returns:
@@ -1809,7 +1809,6 @@ class Data_Management(Api):
             yearly_retention,
             archive_name,
             retention_on_brik_in_days,
-            instant_archive,
             starttime_hour,
             starttime_min,
             duration_hours,
@@ -1867,7 +1866,7 @@ class Data_Management(Api):
             raise InvalidParameterException(
                 "The 'archive_name' and 'retention_on_brik_in_days' parameters must be populated together.")
 
-        if starttime_hour is not None and starttime_min is None or duration_hours is None:
+        if starttime_hour is not None and starttime_min is None and duration_hours is None:
             raise InvalidParameterException(
                 "The 'starttime_hour', 'starttime_min' and 'duration_hours' must be populated together.")
 
@@ -1956,8 +1955,6 @@ class Data_Management(Api):
         if archive_name is not None and archive_name.upper() != "REMOVE":
             archival_location_id = self.object_id(
                 archive_name, "archival_location", timeout=timeout)
-
-
             # convert retention in days to seconds
             retention_on_brik_in_seconds = retention_on_brik_in_days * 86400
             if instant_archive is False:
@@ -1971,7 +1968,7 @@ class Data_Management(Api):
                 "locationId": archival_location_id,
                 "archivalThreshold": archival_threshold
             }]
-        elif archive_name.upper() == "REMOVE":
+        elif archive_name is not None and archive_name.upper() == "REMOVE":
                 config["archivalSpecs"] = []
 
         if replication_target is not None and replication_target != "REMOVE":
@@ -1984,9 +1981,9 @@ class Data_Management(Api):
                 "locationId": replication_target_id,
                 "retentionLimit": replication_retention_in_seconds
             }]
-        elif archive_name.upper() == "REMOVE":
+        elif replication_target is not None and replication_target.upper() == "REMOVE":
                 config["replicationSpecs"] = []
-
+        current_sla_details = {}
         if sla_id is not False:
             self.log(
                 "update_sla: Getting the configuration details for the SLA Domain {} already on the Rubrik cluster.".format(name))
@@ -2030,20 +2027,25 @@ class Data_Management(Api):
                 keys_to_delete.remove("archivalSpecs")
                 current_sla_details["localRetentionLimit"] = archival_threshold
             elif "localRetentionLimit" in current_sla_details:
+                keys_to_delete.remove("archivalSpecs")
                 config["localRetentionLimit"] = current_sla_details["localRetentionLimit"]
+
 
             if starttime_hour is not None:
                 keys_to_delete.remove("allowedBackupWindows")
             elif "allowedBackupWindows" in current_sla_details:
+                keys_to_delete.remove("allowedBackupWindows")
                 config["allowedBackupWindows"] = current_sla_details["allowedBackupWindows"]
 
             if replication_target is not None:
                 keys_to_delete.remove("replicationSpecs")
             elif "replicationSpecs" in current_sla_details:
+                keys_to_delete.remove("replicationSpecs")
                 config["replicationSpecs"] = current_sla_details["replicationSpecs"]
 
             # check for frequency existing settings and leave them in place if no update is provided
             if "frequencies" in config:
+                keys_to_delete.remove("frequencies")
                 for freq in frequency_keys:
                     if freq in current_sla_details['frequencies'] and not freq in config['frequencies']:
                         config['frequencies'][freq] = current_sla_details['frequencies'][freq]
@@ -2058,10 +2060,7 @@ class Data_Management(Api):
                     pass
             if config == current_sla_details:
                 return "No change required. The {} SLA Domain is already configured with the provided configuration.".format(name)
-            # else:
-            #     raise InvalidParameterException(
-            #         "The Rubrik cluster already has an SLA Domain named '{}' whose configuration does not match the values provided.".format(name))
-
+        
         self.log("create_sla: Creating the new SLA")
         if v2_sla is True:
             return self.patch("v2", "/sla_domain/{}".format(sla_id), config, timeout=timeout)
