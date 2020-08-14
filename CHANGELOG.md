@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - **Fixed** for any bug fixes.
 - **Security** in case of vulnerabilities.
 
+## v2.0.11
+
+## Added
+
+- `create_sla()` now supports backup window
+- `create_sla()` now supports replication target cluster by name
+- `update_sla()` supports modifying existing SLA
+- `object_id()` now supports `replication_location`
+
 ## v2.0.10
 
 ## Added
